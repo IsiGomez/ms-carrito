@@ -13,10 +13,6 @@ import lombok.Setter;
 @AllArgsConstructor @NoArgsConstructor
 public class CartRequestDto {
 
-    @NotNull(message = "El ID del usuario es obligatorio")
-    @Positive(message = "El ID del usuario debe ser un valor positivo")
-    private Long userId;
-
     @NotNull(message = "El ID del producto es obligatorio")
     @Positive(message = "El ID del producto debe ser un valor positivo")
     private Long productId;
