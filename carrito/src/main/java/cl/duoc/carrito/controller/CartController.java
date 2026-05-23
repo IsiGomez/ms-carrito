@@ -18,19 +18,24 @@ public class CartController {
 
     private final CartService cartService;
 
-
+    @Operation(summary = "Obtener todo el carrito de un usuario",
+            tags = {"Módulo de Carrito → 1. Consultas de Carrito"})
     @GetMapping("/user/{userId}")
     public ResponseEntity<CartResponseDto> getCart(@PathVariable Long userId) {
         return ResponseEntity.ok(cartService.getCart(userId));
     }
 
 
+    @Operation(summary = "Añadir producto a carrito",
+            tags = {"Módulo de Carrito → 2. Acciones de Carrito"})
     @PostMapping("/user/{userId}/item")
     public ResponseEntity<CartResponseDto> addItem(@PathVariable Long userId, @Valid @RequestBody CartRequestDto request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(cartService.addItem(userId, request));
     }
 
 
+    @Operation(summary = "Actualizar cantidad de un producto que ya existe en el carrito",
+            tags = {"Módulo de Carrito → 2. Acciones de Carrito"})
     @PatchMapping("/user/{userId}/item/{productId}")
     public ResponseEntity<CartResponseDto> updateQuantity(@PathVariable Long userId,
                                                           @PathVariable Long productId,
@@ -39,6 +44,8 @@ public class CartController {
     }
 
 
+    @Operation(summary = "Eliminar un producto del carrito",
+            tags = {"Módulo de Carrito → 2. Acciones de Carrito"})
     @DeleteMapping("/user/{userId}/item/{productId}")
     public ResponseEntity<CartResponseDto> removeItem( @PathVariable Long userId,
                                                        @PathVariable Long productId) {
@@ -46,9 +53,12 @@ public class CartController {
     }
 
 
+    @Operation(summary = "Dejar el carrito vacio",
+            tags = {"Módulo de Carrito → 2. Acciones de Carrito"})
     @DeleteMapping("/user/{userId}/clear")
     public ResponseEntity<Void> clearCart(@PathVariable Long userId) {
         cartService.clearCart(userId);
+
         return ResponseEntity.noContent().build();
     }
 
