@@ -7,9 +7,12 @@ import lombok.Setter;
 
 @Getter             @Setter
 @AllArgsConstructor @NoArgsConstructor
-public class RolDto {
+public class CanjeSimulacionDto {
 
-    private Long id;
-    private String name;
+    private Integer puntosDisponibles;
+    private Integer puntosCanjeables;
+    private Integer montoDescuento;
+    private boolean puedeCanjear;
+    private String mensaje;
 
 }

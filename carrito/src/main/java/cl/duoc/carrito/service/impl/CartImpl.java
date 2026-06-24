@@ -1,11 +1,10 @@
 package cl.duoc.carrito.service.impl;
 
-import cl.duoc.carrito.dto.remote.InventoryDto;
-import cl.duoc.carrito.dto.remote.LoginDto;
-import cl.duoc.carrito.dto.remote.ProductDto;
+import cl.duoc.carrito.dto.remote.*;
 import cl.duoc.carrito.dto.request.CartItemRequestDto;
 import cl.duoc.carrito.dto.request.CartRequestDto;
 import cl.duoc.carrito.dto.response.CartResponseDto;
+import cl.duoc.carrito.dto.response.SimulacionCanjeResponseDto;
 import cl.duoc.carrito.mapper.CartMapper;
 import cl.duoc.carrito.model.Cart;
 import cl.duoc.carrito.model.CartItem;
@@ -14,7 +13,8 @@ import cl.duoc.carrito.repository.CartRepository;
 import cl.duoc.carrito.service.CartService;
 import cl.duoc.carrito.service.apis.CatalogoClient;
 import cl.duoc.carrito.service.apis.InventarioClient;
-import cl.duoc.carrito.service.apis.UsuariosClient;
+import cl.duoc.carrito.service.apis.PromocionesClient;
+import cl.duoc.carrito.service.apis.PuntosClient;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,14 +35,14 @@ public class CartImpl implements CartService {
     private final CartItemRepository cartItemRepository;
     private final CatalogoClient catalogoClient;
     private final InventarioClient inventarioClient;
-    private final UsuariosClient usuariosClient;
+    private final PromocionesClient promocionesClient;
+    private final PuntosClient puntosClient;
     private final CartMapper mapper;
 
     @Override
     @Transactional
     public CartResponseDto getCart(Long userId) {
         log.info("Obteniendo carrito para usuario ID: {}", userId);
-        validateUserClient(userId);
 
         Cart cart = getOrCreateCart(userId);
 
@@ -55,7 +55,6 @@ public class CartImpl implements CartService {
     @Transactional
     public CartResponseDto addItem(Long userId, CartRequestDto request) {
         log.info("Agregando producto ID: {} al carrito del usuario ID: {}", request.getProductId(), userId);
-        validateUserClient(userId);
 
         ProductDto product = catalogoClient.getProductById(request.getProductId());
         if (product == null) {
@@ -110,7 +109,7 @@ public class CartImpl implements CartService {
                         "El producto con ID " + productId + " no está en el carrito"));
 
         InventoryDto stock = inventarioClient.consultarStock(productId);
-        if (stock.getQuantity() < request.getQuantity()) {
+        if (stock.getQuantity() <= request.getQuantity()) {
             throw new IllegalArgumentException(
                     "Stock insuficiente. Stock disponible: " + stock.getQuantity());
         }
@@ -132,7 +131,6 @@ public class CartImpl implements CartService {
     @Transactional
     public CartResponseDto removeItem(Long userId, Long productId) {
         log.info("Eliminando producto ID: {} del carrito del usuario ID: {}", productId, userId);
-        validateUserClient(userId);
 
         Cart cart = getOrCreateCart(userId);
 
@@ -150,11 +148,31 @@ public class CartImpl implements CartService {
         return mapper.toDto(cart, fetchProducts(cart));
     }
 
+
+    @Override
+    public CartResponseDto aplicarPromocion(Long userId, String codigo) {
+        PromocionDto promo = promocionesClient.obtenerPromocion(codigo);
+        if (promo == null || !promo.isVigente()) {
+            throw new IllegalArgumentException("Promoción inválida o expirada");
+        }
+
+        Cart cart = getOrCreateCart(userId);
+
+        if (cart.getItems().isEmpty()) {
+            throw new IllegalArgumentException("El carrito está vacío, no se puede aplicar una promoción");
+        }
+
+        double descuento = cart.getTotal() * (promo.getDescuento() / 100.0);
+        cart.setTotal((int) (cart.getTotal() - descuento));
+        cartRepository.save(cart);
+        return mapper.toDto(cart, fetchProducts(cart));
+    }
+
+
     @Override
     @Transactional
     public void clearCart(Long userId) {
         log.info("Limpiando carrito del usuario ID: {}", userId);
-        validateUserClient(userId);
 
         Cart cart = getOrCreateCart(userId);
 
@@ -165,27 +183,59 @@ public class CartImpl implements CartService {
     }
 
 
+    @Override
+    @Transactional(readOnly = true)
+    public SimulacionCanjeResponseDto simularCanjePuntos(Long userId) {
+        log.info("Simulando canje de puntos para usuario ID: {}", userId);
 
-    // -- Metodos privados --
-    private void validateUserClient(Long userId) {
-        log.info("Validando usuario ID: {}", userId);
-        LoginDto login;
-        try {
-            login = usuariosClient.getRol(userId);
-        } catch (Exception e) {
-            throw new IllegalArgumentException(
-                    "El usuario con ID " + userId + " no existe");
+        CanjeSimulacionDto simulacion = puntosClient.simularCanje(userId);
+        Cart cart = getOrCreateCart(userId);
+
+        if (cart.getItems().isEmpty()) {
+            throw new IllegalArgumentException("El carrito está vacío, no hay nada que pagar.");
         }
 
-        if (login.getRol() == null ||
-                !login.getRol().getName().equalsIgnoreCase("CLIENTE")) {
-            throw new IllegalArgumentException(
-                    "Solo los clientes pueden operar con el carrito");
-        }
+        int totalActual = cart.getTotal();
+        int descuento = simulacion.getMontoDescuento() != null ? simulacion.getMontoDescuento() : 0;
+        int totalConDescuento = Math.max(0, totalActual - descuento);
 
-        log.info("Usuario ID: {} validando correctamente como CLIENTE", userId);
+        return new SimulacionCanjeResponseDto(
+                simulacion.getPuntosDisponibles(),
+                simulacion.getPuntosCanjeables(),
+                descuento,
+                simulacion.isPuedeCanjear(),
+                totalActual,
+                totalConDescuento,
+                simulacion.getMensaje()
+        );
     }
 
+
+    @Override
+    @Transactional
+    public CartResponseDto confirmarCanjePuntos(Long userId) {
+        log.info("Confirmando canje de puntos para usuario ID: {}", userId);
+
+        Cart cart = getOrCreateCart(userId);
+
+        if (cart.getItems().isEmpty()) {
+            throw new IllegalArgumentException("El carrito está vacío, no hay nada que pagar.");
+        }
+
+        CanjeConfirmacionDto canje = puntosClient.confirmarCanje(userId);
+
+        int nuevoTotal = Math.max(0, cart.getTotal() - canje.getMontoDescuento());
+        cart.setTotal(nuevoTotal);
+        cartRepository.save(cart);
+
+        log.info("Canje aplicado al carrito: usuario={}, descuento=${}, totalFinal=${}",
+                userId, canje.getMontoDescuento(), nuevoTotal);
+
+        return mapper.toDto(cart, fetchProducts(cart));
+    }
+
+
+    // -- Metodos privados --
     private Cart getOrCreateCart(Long userId){
         return cartRepository.findByUserId(userId)
                 .orElseGet(() -> createCart(userId));
@@ -199,7 +249,6 @@ public class CartImpl implements CartService {
         Cart saved = cartRepository.save(cart);
         log.info("Carrito ID: {} creado para usuario ID: {}",
                 saved.getId(), userId);
-
 
         return saved;
     }
