@@ -1,7 +1,7 @@
 package cl.duoc.carrito.service.apis;
 
-import cl.supermercado.carrito.dto.remote.CanjeConfirmacionDto;
-import cl.supermercado.carrito.dto.remote.CanjeSimulacionDto;
+import cl.duoc.carrito.dto.remote.CanjeConfirmacionDto;
+import cl.duoc.carrito.dto.remote.CanjeSimulacionDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
