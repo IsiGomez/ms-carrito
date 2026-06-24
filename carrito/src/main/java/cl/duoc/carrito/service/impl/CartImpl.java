@@ -100,7 +100,6 @@ public class CartImpl implements CartService {
     @Transactional
     public CartResponseDto updateQuantity(Long userId, Long productId, CartItemRequestDto request) {
         log.info("Actualizando cantidad del producto ID: {} en carrito del usuario ID: {}", productId, userId);
-        validateUserClient(userId);
 
         Cart cart = getOrCreateCart(userId);
 
