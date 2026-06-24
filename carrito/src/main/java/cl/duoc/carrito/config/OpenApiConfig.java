@@ -28,7 +28,8 @@ public class OpenApiConfig {
                                         .name(SECURITY_SCHEME_NAME)
                                         .type(SecurityScheme.Type.HTTP)
                                         .scheme("bearer")
-                                        .bearerFormat("JWT")))
+                                        .bearerFormat("JWT")
+                                        .description("Ingresa directamente tu token JWT aquí")))
                 .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME));
     }
 
