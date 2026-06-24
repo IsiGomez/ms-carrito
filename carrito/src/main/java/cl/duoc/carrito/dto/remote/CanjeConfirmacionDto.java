@@ -7,10 +7,10 @@ import lombok.Setter;
 
 @Getter             @Setter
 @AllArgsConstructor @NoArgsConstructor
-public class LoginDto {
+public class CanjeConfirmacionDto {
 
-    private Long id;
-    private String username;
-    private RolDto rol;
+    private Integer puntosCanjeados;
+    private Integer montoDescuento;
+    private Integer puntosRestantes;
 
 }
